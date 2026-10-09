@@ -1,0 +1,1097 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#0E0F11" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Team Radio</title>
+<style>
+:root {
+    --bg: #0E0F11;
+    --row-new: #1A1D22;
+    --text: #E8E8EA;
+    --text-2: #9A9DA3;
+    --line: #1F2226;
+    --flag-y: #FFD60A;
+    --flag-r: #FF453A;
+    --sheet: #16181B;
+    --chip: #22252A;
+    --chip-on: #E8E8EA;
+    --chip-on-text: #0E0F11;
+    --live: #30D158;
+    --stale: #FF9F0A;
+    --pit: #64D2FF;
+    --pit-bg: rgb(100 210 255 / 0.16);
+    --text-size: 21px;
+    --gutter-left: max(16px, env(safe-area-inset-left));
+    --gutter-right: max(16px, env(safe-area-inset-right));
+    color-scheme: dark;
+}
+
+@media (prefers-color-scheme: light) {
+    :root {
+        --bg: #FFFFFF;
+        --row-new: #EEF1F5;
+        --text: #16181B;
+        --text-2: #5C6066;
+        --line: #E6E7EA;
+        /* Yellow text is unreadable on white, so light mode uses a dark amber */
+        --flag-y: #9A6700;
+        --flag-r: #C9251B;
+        --sheet: #F5F6F8;
+        --chip: #E9EBEE;
+        --chip-on: #16181B;
+        --chip-on-text: #FFFFFF;
+        --live: #1E8E3E;
+        --stale: #B25E00;
+        --pit: #00658F;
+        --pit-bg: rgb(0 113 164 / 0.12);
+        color-scheme: light;
+    }
+}
+
+* { box-sizing: border-box; }
+
+html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+}
+
+body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-optical-sizing: auto;
+    -webkit-font-smoothing: antialiased;
+    /* The page keeps the reading position itself when rows are inserted above it */
+    overflow-anchor: none;
+}
+
+button {
+    font: inherit;
+    color: inherit;
+    -webkit-tap-highlight-color: transparent;
+    cursor: pointer;
+}
+
+header {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    height: calc(44px + env(safe-area-inset-top));
+    padding: env(safe-area-inset-top) var(--gutter-right) 0 var(--gutter-left);
+    background: var(--bg);
+    border-bottom: 1px solid var(--line);
+}
+
+.status {
+    flex: none;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--stale);
+}
+
+.status.is-live { background: var(--live); }
+
+.title {
+    min-width: 0;
+    overflow: hidden;
+    font-size: 15px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.picked {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 44px;
+    margin-left: auto;
+    padding: 0 0 0 8px;
+    border: 0;
+    background: none;
+    color: var(--text-2);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+}
+
+.picked svg { width: 16px; height: 16px; }
+
+main {
+    max-width: 680px;
+    margin: 0 auto;
+}
+
+.feed {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.clip {
+    position: relative;
+    padding: 14px var(--gutter-right) 14px calc(var(--gutter-left) + 16px);
+    border-bottom: 1px solid var(--line);
+    background: var(--bg);
+}
+
+.clip::before {
+    content: "";
+    position: absolute;
+    top: 14px;
+    bottom: 14px;
+    left: var(--gutter-left);
+    width: 4px;
+    border-radius: 2px;
+    background: var(--team, var(--text-2));
+}
+
+.clip.is-new { background: var(--row-new); }
+
+.clip.is-fading {
+    background: var(--bg);
+    transition: background-color 10s linear;
+}
+
+.meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 24px;
+}
+
+.tla {
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+}
+
+.when {
+    margin-left: auto;
+    color: var(--text-2);
+    font-size: 14px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+}
+
+.ctx {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    color: var(--text-2);
+    font-size: 14px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.ctx .pos { color: var(--text); }
+
+.tyre {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* Compound dot in the usual Pirelli colors; the letter and age stay neutral text */
+.tyre::before {
+    content: "";
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--tyre, var(--text-2));
+    box-shadow: inset 0 0 0 1px rgb(127 127 127 / 0.5);
+}
+
+.tyre[data-compound="S"] { --tyre: #FF453A; }
+.tyre[data-compound="M"] { --tyre: #FFD60A; }
+.tyre[data-compound="H"] { --tyre: #F2F2F2; }
+.tyre[data-compound="I"] { --tyre: #30D158; }
+.tyre[data-compound="W"] { --tyre: #0A84FF; }
+
+.chip {
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: var(--chip);
+    color: var(--text);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+}
+
+.chip-flag-y { background: rgb(255 214 10 / 0.18); color: var(--flag-y); }
+.chip-flag-r { background: rgb(255 69 58 / 0.18); color: var(--flag-r); }
+
+.rc {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    margin: 6px 0 0;
+    color: var(--text-2);
+    font-size: 14px;
+    line-height: 1.3;
+}
+
+.play {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    /* 44px tap area without making the meta row taller */
+    margin: -10px -12px -10px 0;
+    border: 0;
+    border-radius: 22px;
+    background: none;
+    color: var(--text-2);
+}
+
+.play svg { width: 18px; height: 18px; }
+.play[aria-pressed="true"] { color: var(--text); }
+.play:disabled { opacity: 0.3; cursor: default; }
+
+.text {
+    margin: 6px 0 0;
+    font-size: var(--text-size);
+    line-height: 1.32;
+    font-weight: 450;
+    letter-spacing: -0.005em;
+    overflow-wrap: anywhere;
+}
+
+.text b { font-weight: 700; }
+.t-flag-y { color: var(--flag-y); }
+.t-flag-r { color: var(--flag-r); }
+/* Another driver named in the message, in that driver's team color (lightened for contrast like the bars) */
+.text .t-name { color: var(--name); font-weight: 600; }
+/* "Box box": the pit call, marked like a highlighter pen so it stands out from flag terms and names */
+.text .t-pit {
+    padding: 0 4px;
+    border-radius: 4px;
+    background: var(--pit-bg);
+    color: var(--pit);
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+}
+.clip.is-old .text { color: var(--text-2); }
+
+.empty {
+    margin: 0;
+    padding: 48px var(--gutter-right) 48px var(--gutter-left);
+    color: var(--text-2);
+    font-size: 17px;
+    text-align: center;
+}
+
+.pill {
+    position: fixed;
+    top: calc(56px + env(safe-area-inset-top));
+    left: 50%;
+    z-index: 3;
+    min-height: 36px;
+    padding: 0 16px;
+    transform: translateX(-50%);
+    border: 0;
+    border-radius: 18px;
+    background: var(--chip-on);
+    color: var(--chip-on-text);
+    font-size: 15px;
+    font-weight: 600;
+    box-shadow: 0 4px 16px rgb(0 0 0 / 0.3);
+}
+
+[hidden] { display: none !important; }
+
+dialog {
+    width: 100%;
+    max-width: 680px;
+    max-height: 85dvh;
+    margin: auto auto 0;
+    padding: 16px var(--gutter-right) calc(16px + env(safe-area-inset-bottom)) var(--gutter-left);
+    overflow: auto;
+    border: 0;
+    border-radius: 16px 16px 0 0;
+    background: var(--sheet);
+    color: var(--text);
+}
+
+dialog::backdrop { background: rgb(0 0 0 / 0.5); }
+
+.sheet-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+.sheet-head h2 {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 700;
+}
+
+.done {
+    min-height: 44px;
+    padding: 0 4px;
+    border: 0;
+    background: none;
+    font-size: 17px;
+    font-weight: 600;
+}
+
+.all {
+    width: 100%;
+    min-height: 48px;
+    margin-bottom: 8px;
+    border: 0;
+    border-radius: 10px;
+    background: var(--chip);
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.all[aria-pressed="true"], .driver[aria-pressed="true"], .size[aria-pressed="true"], .pace[aria-pressed="true"] {
+    background: var(--chip-on);
+    color: var(--chip-on-text);
+}
+
+.teams {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 8px;
+}
+
+.team {
+    margin: 10px 0 6px;
+    overflow: hidden;
+    color: var(--text-2);
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.pair {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.driver {
+    position: relative;
+    min-height: 48px;
+    border: 0;
+    border-radius: 10px;
+    background: var(--chip);
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+}
+
+.driver::before {
+    content: "";
+    position: absolute;
+    top: 10px;
+    bottom: 10px;
+    left: 6px;
+    width: 3px;
+    border-radius: 2px;
+    background: var(--team, var(--text-2));
+}
+
+.sizes {
+    display: flex;
+    gap: 8px;
+    margin-top: 20px;
+}
+
+.paces { margin-top: 6px; }
+.sizes + .team { margin-top: 16px; }
+
+.size, .pace {
+    flex: 1;
+    min-height: 44px;
+    border: 0;
+    border-radius: 10px;
+    background: var(--chip);
+    font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .clip.is-fading { transition: none; }
+}
+</style>
+</head>
+<body>
+<header id="header">
+    <span class="status" id="status" role="img" aria-label="Connecting"></span>
+    <span class="title" id="title">Team radio</span>
+    <button class="picked" id="open-picker" type="button" aria-haspopup="dialog">
+        <span id="picked-label">All drivers</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M4 17.3V20h2.7L17.8 8.9l-2.7-2.7zM20.7 6a1 1 0 0 0 0-1.4l-1.3-1.3a1 1 0 0 0-1.4 0l-1.1 1.1 2.7 2.7z"/></svg>
+    </button>
+</header>
+<button class="pill" id="pill" type="button" hidden></button>
+<main>
+    <ol class="feed" id="feed"></ol>
+    <p class="empty" id="empty">Waiting for session…</p>
+</main>
+<dialog id="picker" aria-labelledby="picker-title">
+    <div class="sheet-head">
+        <h2 id="picker-title">Drivers</h2>
+        <button class="done" id="picker-done" type="button">Done</button>
+    </div>
+    <button class="all" id="picker-all" type="button" aria-pressed="true">All drivers</button>
+    <div class="teams" id="picker-teams"></div>
+    <h3 class="team">Feed updates</h3>
+    <div class="sizes paces" role="group" aria-label="Feed updates">
+        <button class="pace" type="button" data-pace="0" aria-pressed="false">Live</button>
+        <button class="pace" type="button" data-pace="5" aria-pressed="false">5s</button>
+        <button class="pace" type="button" data-pace="10" aria-pressed="false">10s</button>
+        <button class="pace" type="button" data-pace="-1" aria-pressed="false">Tap</button>
+    </div>
+    <h3 class="team">Text size</h3>
+    <div class="sizes" role="group" aria-label="Text size">
+        <button class="size" type="button" data-size="19" aria-pressed="false" style="font-size:15px">A</button>
+        <button class="size" type="button" data-size="21" aria-pressed="false" style="font-size:18px">A</button>
+        <button class="size" type="button" data-size="24" aria-pressed="false" style="font-size:22px">A</button>
+    </div>
+</dialog>
+<script type="module">
+import { createHighlighter, escapeHtml, getNameWords, isOld, relativeTime, teamBarColor } from '/format.mjs';
+
+const TEXT_SIZE_KEY = 'radio.textSize';
+const TEXT_SIZES = [19, 21, 24];
+const DEFAULT_TEXT_SIZE = 21;
+const NEW_HIGHLIGHT_MS = 10_000;
+const TIME_TICK_MS = 15_000;
+const RECONNECT_MS = 3000;
+const PLAY_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M8 5.5v13l11-6.5z"/></svg>';
+const STOP_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect fill="currentColor" x="6.5" y="6.5" width="11" height="11" rx="1.5"/></svg>';
+
+const elements = {
+    header: document.getElementById('header'),
+    status: document.getElementById('status'),
+    title: document.getElementById('title'),
+    pickedLabel: document.getElementById('picked-label'),
+    openPicker: document.getElementById('open-picker'),
+    pill: document.getElementById('pill'),
+    feed: document.getElementById('feed'),
+    empty: document.getElementById('empty'),
+    picker: document.getElementById('picker'),
+    pickerDone: document.getElementById('picker-done'),
+    pickerAll: document.getElementById('picker-all'),
+    pickerTeams: document.getElementById('picker-teams'),
+    sizes: [...document.querySelectorAll('.size')],
+    paces: [...document.querySelectorAll('.pace')],
+};
+
+const lightScheme = matchMedia('(prefers-color-scheme: light)');
+const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+const audio = new Audio();
+audio.preload = 'none';
+
+const state = {
+    session: null,
+    selection: { drivers: [] },
+    clips: new Map(),
+    maxSeq: 0,
+    draft: new Set(),
+    playingId: null,
+    unseenCount: 0,
+    queue: [],
+    pace: 10,
+    lastFlushAt: 0,
+};
+
+const getJson = async (url) => {
+    const response = await fetch(url, { cache: 'no-store' });
+    if (!response.ok) {
+        throw new Error(`${url} returned ${response.status}`);
+    }
+    return response.json();
+};
+
+const getScheme = () => (lightScheme.matches ? 'light' : 'dark');
+const getDrivers = () => new Map((state.session?.drivers ?? []).map((driver) => [driver.number, driver]));
+
+// Rebuilt only when the session's drivers or the color scheme change, not on every lap update
+let highlighter = { key: null, highlight: createHighlighter() };
+const getHighlight = () => {
+    const drivers = state.session?.drivers ?? [];
+    const scheme = getScheme();
+    const key = `${state.session?.sessionKey}:${scheme}:${drivers.map(({ number, name }) => `${number}${name}`).join()}`;
+    if (highlighter.key !== key) {
+        const names = drivers.flatMap((driver) => getNameWords(driver.name).map((word) => ({
+            word,
+            driverNumber: driver.number,
+            color: teamBarColor(driver.teamColour, scheme),
+        })));
+        highlighter = { key, highlight: createHighlighter(names) };
+    }
+    return highlighter.highlight;
+};
+const isShown = (clip) => state.selection.drivers.length === 0 || state.selection.drivers.includes(clip.driverNumber);
+const byNewest = (a, b) => Date.parse(b.utc) - Date.parse(a.utc);
+
+const renderHeader = () => {
+    const { session, selection } = state;
+    const hasLap = Number.isInteger(session?.lap);
+    const totalLaps = Number.isInteger(session?.totalLaps) ? `/${session.totalLaps}` : '';
+    elements.title.textContent = hasLap ? `Lap ${session.lap}${totalLaps}` : (session?.sessionName ?? 'Team radio');
+
+    const drivers = getDrivers();
+    const codes = selection.drivers.map((number) => drivers.get(number)?.tla ?? `#${number}`);
+    const hasMany = codes.length > 4;
+    if (codes.length === 0) {
+        elements.pickedLabel.textContent = 'All drivers';
+        return;
+    }
+    elements.pickedLabel.textContent = hasMany ? `${codes.slice(0, 3).join(' ')} +${codes.length - 3}` : codes.join(' ');
+};
+
+const renderEmpty = () => {
+    const hasRows = elements.feed.children.length > 0;
+    elements.empty.hidden = hasRows;
+    elements.empty.textContent = state.session ? 'No radio yet for these drivers.' : 'Waiting for session…';
+};
+
+const TRACK_CHIP_CLASSES = { SC: 'chip-flag-y', VSC: 'chip-flag-y', 'VSC ENDING': 'chip-flag-y', RED: 'chip-flag-r' };
+// Race control notes about a driver are often issued after the radio about the incident, so the window leans forward
+const RACE_CONTROL_BEFORE_MS = 30_000;
+const RACE_CONTROL_AFTER_MS = 120_000;
+const RACE_CONTROL_PER_CLIP = 2;
+
+const renderContext = (context) => {
+    if (!context) {
+        return '';
+    }
+    const { position, gapAhead, tyre, pit } = context;
+    const parts = [];
+    if (Number.isInteger(position)) {
+        parts.push(`<span class="pos">P${position}</span>`);
+    }
+    if (gapAhead) {
+        parts.push(`<span>${escapeHtml(gapAhead)}</span>`);
+    }
+    if (tyre) {
+        const age = Number.isInteger(tyre.age) ? tyre.age : '';
+        parts.push(`<span class="tyre" data-compound="${escapeHtml(tyre.letter)}" title="${escapeHtml(tyre.compound)}">${escapeHtml(tyre.letter)}${age}</span>`);
+    }
+    if (pit) {
+        parts.push(`<span class="chip">${escapeHtml(pit)}</span>`);
+    }
+    return parts.length > 0 ? `<span class="ctx">${parts.join('')}</span>` : '';
+};
+
+const renderTrackChip = (context) => {
+    const label = context?.trackStatus;
+    if (!label) {
+        return '';
+    }
+    return `<span class="chip ${TRACK_CHIP_CLASSES[label] ?? ''}">${escapeHtml(label)}</span>`;
+};
+
+const getRaceControlFor = (clip) => {
+    const time = Date.parse(clip.utc);
+    return (state.session?.raceControl ?? [])
+        .filter(({ utc, cars }) => {
+            const delta = Date.parse(utc) - time;
+            return cars.includes(clip.driverNumber) && delta >= -RACE_CONTROL_BEFORE_MS && delta <= RACE_CONTROL_AFTER_MS;
+        })
+        .slice(-RACE_CONTROL_PER_CLIP);
+};
+
+const renderRaceControl = (clip) =>
+    getRaceControlFor(clip)
+        .map(({ message }) => `<p class="rc"><span class="chip">RC</span><span>${escapeHtml(message)}</span></p>`)
+        .join('');
+
+const renderClip = (clip, drivers) => {
+    const item = document.createElement('li');
+    item.className = 'clip';
+    item.dataset.id = clip.id;
+    item.dataset.utc = clip.utc;
+    item.style.setProperty('--team', teamBarColor(drivers.get(clip.driverNumber)?.teamColour, getScheme()));
+    const code = clip.driver ?? `#${clip.driverNumber}`;
+    // In races the driver's own lap beats the session lap, which is the leader's and wrong for lapped cars
+    const lapNumber = clip.context?.driverLap ?? clip.lap;
+    const lap = Number.isInteger(lapNumber) ? `L${lapNumber} · ` : '';
+    const isPlaying = state.playingId === clip.id;
+    item.innerHTML = `
+        <div class="meta">
+            <span class="tla">${escapeHtml(code)}</span>
+            ${renderContext(clip.context)}
+            <span class="when">${renderTrackChip(clip.context)} ${lap}<time datetime="${escapeHtml(clip.utc)}">${relativeTime(clip.utc)}</time></span>
+            ${clip.audioSrc ? `<button class="play" type="button" data-src="${escapeHtml(clip.audioSrc)}" aria-label="Play ${escapeHtml(code)} radio" aria-pressed="${isPlaying}">${isPlaying ? STOP_ICON : PLAY_ICON}</button>` : ''}
+        </div>
+        <p class="text">${getHighlight()(clip.text, { speakerNumber: clip.driverNumber })}</p>
+        <div class="rc-list">${renderRaceControl(clip)}</div>`;
+    item.classList.toggle('is-old', isOld(clip.utc));
+    return item;
+};
+
+const updateTimes = () => {
+    const now = Date.now();
+    for (const item of elements.feed.children) {
+        const { utc } = item.dataset;
+        item.querySelector('time').textContent = relativeTime(utc, now);
+        item.classList.toggle('is-old', isOld(utc, now));
+    }
+};
+
+const renderFeed = () => {
+    const drivers = getDrivers();
+    const visible = [...state.clips.values()].filter(isShown).sort(byNewest);
+    elements.feed.replaceChildren(...visible.map((clip) => renderClip(clip, drivers)));
+    renderEmpty();
+};
+
+// Held clips win the pill: tapping it shows them. Otherwise it counts rows that landed above the viewport.
+const renderPill = () => {
+    const queued = state.queue.length;
+    if (queued > 0) {
+        elements.pill.textContent = `${queued} new · show`;
+        elements.pill.hidden = false;
+        return;
+    }
+    elements.pill.textContent = `${state.unseenCount} new ↑`;
+    elements.pill.hidden = state.unseenCount === 0;
+};
+
+const clearUnseen = () => {
+    state.unseenCount = 0;
+    renderPill();
+};
+
+const showUnseen = () => {
+    state.unseenCount += 1;
+    renderPill();
+};
+
+const markNew = (item) => {
+    item.classList.add('is-new');
+    if (reducedMotion.matches) {
+        setTimeout(() => item.classList.remove('is-new'), NEW_HIGHLIGHT_MS);
+        return;
+    }
+    // Two frames so the row paints with the highlight before the 10s fade starts
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+        item.classList.add('is-fading');
+        item.classList.remove('is-new');
+    }));
+    setTimeout(() => item.classList.remove('is-fading'), NEW_HIGHLIGHT_MS);
+};
+
+const insertClip = (clip) => {
+    const item = renderClip(clip, getDrivers());
+    const time = Date.parse(clip.utc);
+    const next = [...elements.feed.children].find((child) => Date.parse(child.dataset.utc) < time) ?? null;
+    elements.feed.insertBefore(item, next);
+    // Rows added above the viewport would push the text being read down, so scroll by the row's height
+    const isAboveViewport = window.scrollY > 0 && item.getBoundingClientRect().top < elements.header.offsetHeight;
+    if (isAboveViewport) {
+        window.scrollBy(0, item.offsetHeight);
+        showUnseen();
+    }
+    return item;
+};
+
+const trackSeq = (clip) => {
+    state.maxSeq = Math.max(state.maxSeq, clip.seq ?? 0);
+};
+
+const findRow = (id) => elements.feed.querySelector(`.clip[data-id="${CSS.escape(id)}"]`);
+
+const addClip = (clip, { isLive }) => {
+    trackSeq(clip);
+    if (clip.deleted) {
+        state.clips.delete(clip.id);
+        findRow(clip.id)?.remove();
+        renderEmpty();
+        return;
+    }
+    const existing = state.clips.get(clip.id);
+    if (existing && existing.text === clip.text) {
+        return;
+    }
+    state.clips.set(clip.id, clip);
+    if (!isShown(clip)) {
+        return;
+    }
+    // MultiViewer corrects transcriptions after the fact, so a known id swaps its row in place
+    const existingRow = existing ? findRow(clip.id) : null;
+    if (existingRow) {
+        existingRow.replaceWith(renderClip(clip, getDrivers()));
+        return;
+    }
+    const item = insertClip(clip);
+    renderEmpty();
+    if (isLive) {
+        markNew(item);
+    }
+};
+
+const loadClips = async () => {
+    const clips = await getJson('/api/clips');
+    // A full load already contains everything that was held
+    state.queue = [];
+    state.clips = new Map(clips.map((clip) => [clip.id, clip]));
+    state.maxSeq = 0;
+    clips.forEach(trackSeq);
+    renderFeed();
+    renderPill();
+};
+
+// Live clips are held and added in batches so the feed does not move every second while you read.
+// Pace 0 is live, -1 waits for a tap on the pill, anything else is seconds between batches.
+const PACE_KEY = 'radio.pace';
+const PACES = [0, 5, 10, -1];
+const DEFAULT_PACE = 10;
+
+const flushQueue = () => {
+    const held = state.queue.splice(0);
+    state.lastFlushAt = Date.now();
+    held.forEach((clip) => addClip(clip, { isLive: true }));
+    renderPill();
+};
+
+const receiveClip = (clip) => {
+    if (state.pace === 0) {
+        addClip(clip, { isLive: true });
+        return;
+    }
+    // A newer version of a held clip replaces it in the queue instead of adding a second entry
+    const heldIndex = state.queue.findIndex(({ id }) => id === clip.id);
+    if (heldIndex === -1) {
+        state.queue.push(clip);
+    } else {
+        state.queue[heldIndex] = clip;
+    }
+    renderPill();
+};
+
+const handlePaceTick = () => {
+    const isDue = state.pace > 0 && Date.now() - state.lastFlushAt >= state.pace * 1000;
+    if (isDue && state.queue.length > 0) {
+        flushQueue();
+    }
+};
+
+const applyPace = (pace) => {
+    state.pace = PACES.includes(pace) ? pace : DEFAULT_PACE;
+    for (const button of elements.paces) {
+        button.setAttribute('aria-pressed', String(Number(button.dataset.pace) === state.pace));
+    }
+    if (state.pace === 0) {
+        flushQueue();
+    }
+    try {
+        localStorage.setItem(PACE_KEY, String(state.pace));
+    } catch {
+        // Private mode can block storage; the pace still applies for this visit
+    }
+};
+
+const readPace = () => {
+    try {
+        const stored = localStorage.getItem(PACE_KEY);
+        return stored === null ? DEFAULT_PACE : Number(stored);
+    } catch {
+        return DEFAULT_PACE;
+    }
+};
+
+const catchUp = async () => {
+    const clips = await getJson(`/api/clips?after=${state.maxSeq}`);
+    clips.forEach(receiveClip);
+};
+
+const setPlaying = (id) => {
+    state.playingId = id;
+    for (const button of elements.feed.querySelectorAll('.play')) {
+        const isPlaying = button.closest('.clip').dataset.id === id;
+        button.setAttribute('aria-pressed', String(isPlaying));
+        button.innerHTML = isPlaying ? STOP_ICON : PLAY_ICON;
+    }
+};
+
+const stopAudio = () => {
+    audio.pause();
+    setPlaying(null);
+};
+
+const handleAudioError = () => {
+    const button = state.playingId ? elements.feed.querySelector(`.clip[data-id="${CSS.escape(state.playingId)}"] .play`) : null;
+    if (button) {
+        button.disabled = true;
+        button.setAttribute('aria-label', 'Audio unavailable');
+    }
+    setPlaying(null);
+};
+
+const handleFeedClick = (event) => {
+    const button = event.target.closest('.play');
+    if (!button || button.disabled) {
+        return;
+    }
+    const { id } = button.closest('.clip').dataset;
+    if (state.playingId === id) {
+        stopAudio();
+        return;
+    }
+    audio.src = button.dataset.src;
+    setPlaying(id);
+    audio.play().catch(() => {
+        // Starting another clip aborts this play(); that rejection must not reset the newer clip's button
+        if (state.playingId !== id) {
+            return;
+        }
+        if (audio.error) {
+            handleAudioError();
+            return;
+        }
+        setPlaying(null);
+    });
+};
+
+const applySelection = (selection) => {
+    state.selection = selection;
+    renderHeader();
+    renderFeed();
+};
+
+// New race control notes can concern radio already on screen, so only those rows' notes are redrawn in place
+const refreshRaceControl = () => {
+    for (const item of elements.feed.children) {
+        const clip = state.clips.get(item.dataset.id);
+        const list = item.querySelector('.rc-list');
+        const html = clip ? renderRaceControl(clip) : '';
+        if (list && list.innerHTML !== html) {
+            list.innerHTML = html;
+        }
+    }
+};
+
+const applySession = async (session) => {
+    const isNewSession = String(session?.sessionKey) !== String(state.session?.sessionKey);
+    const hasNewRaceControl = (session?.raceControl?.length ?? 0) !== (state.session?.raceControl?.length ?? 0);
+    state.session = session;
+    renderHeader();
+    if (!isNewSession) {
+        if (hasNewRaceControl) {
+            refreshRaceControl();
+        }
+        return;
+    }
+    stopAudio();
+    clearUnseen();
+    await loadClips();
+};
+
+const applyTextSize = (size) => {
+    const value = TEXT_SIZES.includes(size) ? size : DEFAULT_TEXT_SIZE;
+    document.documentElement.style.setProperty('--text-size', `${value}px`);
+    for (const button of elements.sizes) {
+        button.setAttribute('aria-pressed', String(Number(button.dataset.size) === value));
+    }
+    try {
+        localStorage.setItem(TEXT_SIZE_KEY, String(value));
+    } catch {
+        // Private mode can block storage; the size still applies for this visit
+    }
+};
+
+const readTextSize = () => {
+    try {
+        return Number(localStorage.getItem(TEXT_SIZE_KEY)) || DEFAULT_TEXT_SIZE;
+    } catch {
+        return DEFAULT_TEXT_SIZE;
+    }
+};
+
+const renderPicker = () => {
+    const groups = new Map();
+    for (const driver of state.session?.drivers ?? []) {
+        const team = driver.team ?? 'Other';
+        groups.set(team, [...(groups.get(team) ?? []), driver]);
+    }
+    const scheme = getScheme();
+    elements.pickerTeams.innerHTML = [...groups].map(([team, drivers]) => `
+        <section>
+            <h3 class="team">${escapeHtml(team)}</h3>
+            <div class="pair">
+                ${drivers.map((driver) => `<button class="driver" type="button" data-number="${driver.number}" aria-pressed="${state.draft.has(driver.number)}" style="--team:${teamBarColor(driver.teamColour, scheme)}">${escapeHtml(driver.tla ?? driver.number)}</button>`).join('')}
+            </div>
+        </section>`).join('');
+    elements.pickerAll.setAttribute('aria-pressed', String(state.draft.size === 0));
+};
+
+const handleOpenPicker = () => {
+    state.draft = new Set(state.selection.drivers);
+    renderPicker();
+    elements.picker.showModal();
+};
+
+const handlePickerClick = (event) => {
+    const rect = elements.picker.getBoundingClientRect();
+    const isOutside = event.clientY < rect.top || event.clientY > rect.bottom || event.clientX < rect.left || event.clientX > rect.right;
+    // Keyboard-activated clicks report 0,0 coordinates, so only a click on the dialog itself can be a backdrop click
+    const isBackdrop = event.target === elements.picker && isOutside;
+    if (isBackdrop) {
+        elements.picker.close();
+        return;
+    }
+    const driverButton = event.target.closest('.driver');
+    if (driverButton) {
+        const number = Number(driverButton.dataset.number);
+        if (state.draft.has(number)) {
+            state.draft.delete(number);
+        } else {
+            state.draft.add(number);
+        }
+        renderPicker();
+        return;
+    }
+    const paceButton = event.target.closest('.pace');
+    if (paceButton) {
+        applyPace(Number(paceButton.dataset.pace));
+        return;
+    }
+    const sizeButton = event.target.closest('.size');
+    if (sizeButton) {
+        applyTextSize(Number(sizeButton.dataset.size));
+    }
+};
+
+const handlePickerAll = () => {
+    state.draft.clear();
+    renderPicker();
+};
+
+const handlePickerDone = () => elements.picker.close();
+
+// Sent once when the sheet closes so the transcriber never acts on a half-made selection
+const handlePickerClose = async () => {
+    const drivers = [...state.draft].sort((a, b) => a - b);
+    const isUnchanged = drivers.join() === state.selection.drivers.join();
+    if (isUnchanged) {
+        return;
+    }
+    applySelection({ ...state.selection, drivers });
+    try {
+        const response = await fetch('/api/selection', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ drivers }),
+        });
+        if (!response.ok) {
+            throw new Error(`selection returned ${response.status}`);
+        }
+        applySelection(await response.json());
+    } catch (error) {
+        console.error(error);
+        try {
+            applySelection(await getJson('/api/selection'));
+        } catch (fallbackError) {
+            console.error(fallbackError);
+        }
+    }
+};
+
+const handlePillClick = () => {
+    // Instant jump on purpose. Smooth scrolling gets cancelled by the reading-position
+    // compensation in insertClip (window.scrollBy) when clips arrive mid-animation,
+    // which leaves the page stuck part way down while the pill hides.
+    window.scrollTo({ top: 0, behavior: 'auto' });
+    flushQueue();
+    clearUnseen();
+};
+
+const handleScroll = () => {
+    if (window.scrollY < 40) {
+        clearUnseen();
+    }
+};
+
+const handleVisibilityChange = () => {
+    if (document.visibilityState === 'visible') {
+        catchUp().catch((error) => console.error(error));
+    }
+};
+
+const setLive = (isLive) => {
+    elements.status.classList.toggle('is-live', isLive);
+    elements.status.setAttribute('aria-label', isLive ? 'Live' : 'Reconnecting');
+};
+
+const connect = () => {
+    const stream = new EventSource('/api/stream');
+    stream.addEventListener('open', () => {
+        setLive(true);
+        // A selection or session event sent while the phone slept is gone for good, so refetch both on every (re)connect
+        catchUp().catch((error) => console.error(error));
+        getJson('/api/selection').then(applySelection).catch((error) => console.error(error));
+        getJson('/api/session').then(applySession).catch((error) => console.error(error));
+    });
+    stream.addEventListener('error', () => {
+        setLive(false);
+        // EventSource retries on its own unless the server answered with an error, which closes it for good
+        if (stream.readyState === EventSource.CLOSED) {
+            setTimeout(connect, RECONNECT_MS);
+        }
+    });
+    stream.addEventListener('clip', (event) => receiveClip(JSON.parse(event.data)));
+    stream.addEventListener('session', (event) => applySession(JSON.parse(event.data)).catch((error) => console.error(error)));
+    stream.addEventListener('selection', (event) => applySelection(JSON.parse(event.data)));
+    stream.addEventListener('reset', () => loadClips().catch((error) => console.error(error)));
+};
+
+const start = async () => {
+    applyTextSize(readTextSize());
+    applyPace(readPace());
+    const [session, selection] = await Promise.all([getJson('/api/session'), getJson('/api/selection')]);
+    state.session = session;
+    state.selection = selection;
+    renderHeader();
+    await loadClips();
+    connect();
+
+    elements.feed.addEventListener('click', handleFeedClick);
+    elements.openPicker.addEventListener('click', handleOpenPicker);
+    elements.picker.addEventListener('click', handlePickerClick);
+    elements.picker.addEventListener('close', handlePickerClose);
+    elements.pickerAll.addEventListener('click', handlePickerAll);
+    elements.pickerDone.addEventListener('click', handlePickerDone);
+    elements.pill.addEventListener('click', handlePillClick);
+    audio.addEventListener('ended', () => setPlaying(null));
+    audio.addEventListener('error', handleAudioError);
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    lightScheme.addEventListener('change', renderFeed);
+    // Runs for the page's whole life, so it is never cleared
+    setInterval(updateTimes, TIME_TICK_MS);
+    // Runs for the page's whole life, so it is never cleared
+    setInterval(handlePaceTick, 1000);
+};
+
+start().catch((error) => {
+    console.error(error);
+    elements.empty.hidden = false;
+    elements.empty.textContent = 'Could not reach the radio server.';
+});
+</script>
+</body>
+</html>
