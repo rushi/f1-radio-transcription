@@ -1,0 +1,31 @@
+{
+  "name": "f1-radio-transcription",
+  "version": "0.1.0",
+  "description": "Live F1 team radio transcripts on your phone, with race context, from MultiViewer or faster-whisper.",
+  "private": true,
+  "license": "MIT",
+  "author": "Rushi Vishavadia",
+  "type": "module",
+  "keywords": [
+    "formula1",
+    "f1",
+    "team-radio",
+    "transcription",
+    "multiviewer",
+    "whisper"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
+  "packageManager": "pnpm@10.34.5",
+  "scripts": {
+    "transcribe": "zx transcribe-radio.mjs",
+    "race": "node race.mjs",
+    "replay": "node race.mjs --replay",
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "qrcode-terminal": "0.12.0",
+    "zx": "8.8.5"
+  }
+}

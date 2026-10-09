@@ -1,0 +1,7 @@
+.env
+.venv/
+node_modules/
+data/
+comparison*.html
+.claude/
+.DS_Store
