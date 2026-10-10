@@ -22,28 +22,27 @@ The page runs on your Mac and you open it on your phone over the same Wi-Fi. Tra
 ## Requirements
 
 - macOS (the team color overrides and the Apple speech script are macOS only)
-- Node.js 24 (`.node-version` pins `24.18.0`) and pnpm
+- Python 3.12 or later (`.python-version` pins `3.14`) and [uv](https://docs.astral.sh/uv/)
 - [MultiViewer](https://multiviewer.app) running with a live or replayed F1 session open
-- For the Whisper sources only: Python 3, [uv](https://docs.astral.sh/uv/) and ffmpeg
+- For the Whisper sources only: ffmpeg
+- For the browser tests only: Node.js 24 (`.node-version` pins `24.18.0`)
 - For the OpenF1 source only: an OpenF1 account
 
 ## Installation
 
-1. Install the Node dependencies:
+1. Install the dependencies:
 
    ```bash
-   pnpm install
+   uv sync
    ```
 
-2. For the Whisper sources, create the Python environment:
-
-   ```bash
-   uv venv .venv
-   ```
+2. For the Whisper sources, add faster-whisper:
 
    ```bash
-   uv pip install --python .venv/bin/python -r requirements.txt
+   uv sync --extra whisper
    ```
+
+   A plain `uv sync` removes faster-whisper again, so always pass `--extra whisper` once you use those sources.
 
 3. For the OpenF1 source, add your credentials to `.env`:
 
@@ -55,7 +54,7 @@ The page runs on your Mac and you open it on your phone over the same Wi-Fi. Tra
 Verify the install by running the tests:
 
 ```bash
-pnpm test
+uv run pytest
 ```
 
 ## Usage
@@ -64,23 +63,23 @@ pnpm test
 2. Start the transcriber and web server:
 
    ```bash
-   pnpm race
+   uv run race
    ```
 
 3. Scan the QR code printed in the terminal with your phone, or open the `http://<mac-ip>:10303` URL it prints. The phone must be on the same Wi-Fi as the Mac.
 4. Stop everything with Ctrl-C.
 
-On the first run, macOS asks whether `node` can accept incoming connections. Click Allow, or the phone cannot reach the page. The page cannot keep your phone awake over plain HTTP, so set iOS Auto-Lock to Never for the race.
+On the first run, macOS asks whether `python` can accept incoming connections. Click Allow, or the phone cannot reach the page. The page cannot keep your phone awake over plain HTTP, so set iOS Auto-Lock to Never for the race.
 
 To test the page without a live session, replay a recorded session from `data/`:
 
 ```bash
-pnpm replay 11377
+uv run race --replay 11377
 ```
 
 ## Sources
 
-`pnpm race` takes a `--source` flag, for example `pnpm race --source openf1`.
+`uv run race` takes a `--source` flag, for example `uv run race --source openf1`.
 
 | Source | What it does | Audio | Latency |
 | --- | --- | --- | --- |
@@ -88,7 +87,7 @@ pnpm replay 11377
 | `multiviewer` | Downloads the official F1 radio clips listed by MultiViewer and transcribes them with faster-whisper | Yes | 10 to 20s after F1 publishes a clip |
 | `openf1` | Same as `multiviewer`, but lists clips from the OpenF1 API | Yes | Same as `multiviewer` |
 
-The default source has far more messages. F1 publishes only a handful of official clips per session, and none at all for some 2026 events. MultiViewer's backend is undocumented and needs no login today, so a MultiViewer update can change or close it. If that happens, run `pnpm race --source multiviewer`.
+The default source has far more messages. F1 publishes only a handful of official clips per session, and none at all for some 2026 events. MultiViewer's backend is undocumented and needs no login today, so a MultiViewer update can change or close it. If that happens, run `uv run race --source multiviewer`.
 
 ## The page
 
@@ -121,10 +120,10 @@ The phone remembers feed pace and text size. The Mac saves the driver pick in `d
 
 | Setting | Where | Default |
 | --- | --- | --- |
-| Source | `pnpm race --source <name>` | `multiviewer-ai` |
-| Web server port | `PORT` environment variable for `server.mjs` | `10303` |
-| Data directory | `DATA_DIR` environment variable for `server.mjs` | `./data` |
-| Whisper model | `node transcribe-radio.mjs --model <name>` | `small.en` |
+| Source | `uv run race --source <name>` | `multiviewer-ai` |
+| Web server port | `PORT` environment variable for `uv run server` | `10303` |
+| Data directory | `DATA_DIR` environment variable for `uv run server` | `./data` |
+| Whisper model | `uv run transcribe-radio --model <name>` | `small.en` |
 | Team colors | MultiViewer settings, read from `~/Library/Application Support/MultiViewer/config.json` | Official 2026 team colors |
 
 The page lightens team colors that are too dark to read on the dark background, including your custom ones.
@@ -135,30 +134,34 @@ The page lightens team colors that are too dark to read on the dark background, 
 MultiViewer (localhost:10101 GraphQL + its backend socket)
         │
         ▼
-mv-radio.mjs or transcribe-radio.mjs   writes data/current.json, data/<session>/transcripts.jsonl
+mv_radio.py or transcribe_radio.py     writes data/current.json, data/<session>/transcripts.jsonl
         │
         ▼
-server.mjs                             follows those files, serves the page, pushes new clips over SSE
+server.py                              follows those files, serves the page, pushes new clips over SSE
         │
         ▼
 web/index.html on your phone
 ```
 
-- `race.mjs` starts the feed and the server together, restarts either one if it crashes, and prints the phone URL and QR code.
-- `mv-radio.mjs` joins MultiViewer's `driver_radio_transcriptions:session:<key>` channel, loads the session's history after every join, and polls MultiViewer's live timing every 2s for context.
-- `transcribe-radio.mjs` lists radio clips, downloads new ones, and runs `transcribe.py` (faster-whisper with an F1 vocabulary prompt and the session's driver names as hotwords).
-- `replay.mjs` replays a recorded session into `data/replay/` for testing.
+The Python code lives in `f1radio/` and runs on asyncio, with aiohttp for HTTP and websockets for the MultiViewer socket.
+
+- `race.py` starts the feed and the server together, restarts either one if it crashes, and prints the phone URL and QR code.
+- `mv_radio.py` joins MultiViewer's `driver_radio_transcriptions:session:<key>` channel, loads the session's history after every join, and polls MultiViewer's live timing every 2s for context.
+- `transcribe_radio.py` lists radio clips, downloads new ones, and transcribes them with `whisper.py` (faster-whisper with an F1 vocabulary prompt and the session's driver names as hotwords). The model loads once at startup.
+- `replay.py` replays a recorded session into `data/replay/` for testing.
 - `apple-transcribe.swift` transcribes MP3s with macOS's on-device speech recognition. It is a comparison tool, not part of the pipeline.
 
 ## Development
 
 | Command | What it does |
 | --- | --- |
-| `pnpm test` | Runs the `node:test` suite in `test/` |
-| `pnpm race` | Starts the feed and web server |
-| `pnpm replay <sessionKey>` | Replays a recorded session with the web server |
-| `node transcribe-radio.mjs --once --source openf1 --session 9896` | Transcribes one past OpenF1 session |
-| `node transcribe-radio.mjs --once --redo` | Re-transcribes a session's saved audio |
+| `uv run pytest` | Runs the pytest suite in `tests/` |
+| `node --test tests/format.test.mjs` | Runs the browser formatting tests for `web/format.mjs` |
+| `uv run race` | Starts the feed and web server |
+| `uv run race --replay <sessionKey>` | Replays a recorded session with the web server |
+| `uv run transcribe-radio --once --source openf1 --session 9896` | Transcribes one past OpenF1 session |
+| `uv run transcribe-radio --once --redo` | Re-transcribes a session's saved audio |
+| `uv run python -m f1radio.whisper <files>` | Transcribes MP3 files and prints one JSON object per file |
 
 `data/` holds downloaded audio, transcripts and session state. It is gitignored.
 
@@ -176,7 +179,11 @@ Issues and pull requests are welcome. Before you open a pull request:
 1. Run the tests and make sure they pass:
 
    ```bash
-   pnpm test
+   uv run pytest
+   ```
+
+   ```bash
+   node --test tests/format.test.mjs
    ```
 
 2. Keep changes to one concern per pull request.
